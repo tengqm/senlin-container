@@ -15,6 +15,7 @@ import datetime
 import functools
 import uuid
 
+from docker import Client
 from oslo_config import cfg
 from oslo_log import log as logging
 import oslo_messaging
@@ -720,7 +721,7 @@ class EngineService(service.Service):
     @request_context
     def cluster_create(self, context, name, desired_capacity, profile_id,
                        min_size=None, max_size=None, metadata=None,
-                       timeout=None):
+                       timeout=None, host_cluster=None):
         """Create a cluster.
 
         :param context: An instance of the request context.
@@ -765,6 +766,10 @@ class EngineService(service.Service):
             raise exception.BadRequest(msg=res)
 
         LOG.info(_LI("Creating cluster '%s'."), name)
+        if host_cluster:
+            host_cluster = self.cluster_get(context, host_cluster)
+            host_nodes = host_cluster['nodes']
+            metadata.update(nodes=host_nodes)
 
         kwargs = {
             'min_size': min_size,
@@ -1368,7 +1373,7 @@ class EngineService(service.Service):
 
     @request_context
     def node_create(self, context, name, profile_id, cluster_id=None,
-                    role=None, metadata=None):
+                    role=None, metadata=None, host=None, container_name=None):
         """Create a node with provided properties.
 
         :param context: An instance of the request context.
@@ -1422,6 +1427,11 @@ class EngineService(service.Service):
             index = db_api.cluster_next_index(context, cluster_id)
 
         # Create a node instance
+        if host:
+            host_ip = self.get_host_ip(context, host)
+            metadata.update(host_ip=host_ip)
+        if container_name:
+            metadata.update(container_name=container_name)
         kwargs = {
             'index': index,
             'role': role,
@@ -1430,7 +1440,6 @@ class EngineService(service.Service):
             'project': context.project,
             'domain': context.domain,
         }
-
         node = node_mod.Node(name, node_profile.id, cluster_id, context,
                              **kwargs)
         node.store(context)
@@ -1539,7 +1548,7 @@ class EngineService(service.Service):
         return resp
 
     @request_context
-    def node_delete(self, context, identity):
+    def node_delete(self, context, identity, container_name=None):
         """Delete the specified node.
 
         :param context: An instance of the request context.
@@ -2171,3 +2180,27 @@ class EngineService(service.Service):
         """
         db_event = self.event_find(context, identity)
         return db_event.as_dict()
+
+    def get_host_ip(self, context, host):
+        if host:
+            db_node = self.node_find(context, host)
+            physical_id = db_node.physical_id
+            if not physical_id:
+                return
+            node = node_mod.Node.load(context, node_id=db_node.id)
+            details = node.get_details(context)
+            for output in details.outputs:
+                if output['output_key'] == 'floating_ip':
+                    server_ip = output['output_value']
+        return server_ip
+
+    @request_context
+    def container_list(self, context, limit, host):
+        server_ip = self.get_host_ip(context, host)
+        if server_ip:
+            url = 'tcp://' + server_ip + ':2375'
+            docker_cli = Client(base_url=url)
+            containers = docker_cli.containers(all=True)
+            for j in range(len(containers)):
+                containers[j]['Server'] = server_ip
+                return containers

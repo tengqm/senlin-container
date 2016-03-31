@@ -75,14 +75,14 @@ CLUSTER_ATTRS = (
     CLUSTER_DOMAIN, CLUSTER_PROJECT, CLUSTER_USER,
     CLUSTER_INIT_AT, CLUSTER_CREATED_AT, CLUSTER_UPDATED_AT,
     CLUSTER_STATUS, CLUSTER_STATUS_REASON, CLUSTER_TIMEOUT,
-    CLUSTER_METADATA,
+    CLUSTER_METADATA, HOST_CLUSTER,
 ) = (
     'name', 'profile_id', 'desired_capacity',
     'min_size', 'max_size', 'id',
     'domain', 'project', 'user',
     'init_at', 'created_at', 'updated_at',
     'status', 'status_reason', 'timeout',
-    'metadata',
+    'metadata', 'host_cluster',
 )
 
 CLUSTER_SORT_KEYS = [
@@ -99,11 +99,11 @@ DETECTION_TYPES = (
 NODE_ATTRS = (
     NODE_INDEX, NODE_NAME, NODE_PROFILE_ID, NODE_CLUSTER_ID,
     NODE_INIT_AT, NODE_CREATED_AT, NODE_UPDATED_AT,
-    NODE_STATUS, NODE_ROLE, NODE_METADATA,
+    NODE_STATUS, NODE_ROLE, NODE_METADATA, HOST, CONTAINER_NAME,
 ) = (
     'index', 'name', 'profile_id', 'cluster_id',
     'init_at', 'created_at', 'updated_at',
-    'status', 'role', 'metadata',
+    'status', 'role', 'metadata', 'host', 'container_name',
 )
 
 NODE_SORT_KEYS = [
