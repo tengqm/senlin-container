@@ -143,7 +143,7 @@ class EngineClient(object):
 
     def cluster_create(self, ctxt, name, desired_capacity, profile_id,
                        min_size=None, max_size=None, metadata=None,
-                       timeout=None):
+                       timeout=None, host_cluster=None):
         return self.call(ctxt, self.make_msg('cluster_create',
                                              name=name,
                                              desired_capacity=desired_capacity,
@@ -151,7 +151,8 @@ class EngineClient(object):
                                              min_size=min_size,
                                              max_size=max_size,
                                              metadata=metadata,
-                                             timeout=timeout))
+                                             timeout=timeout,
+                                             host_cluster=host_cluster))
 
     def cluster_add_nodes(self, ctxt, identity, nodes):
         return self.call(ctxt, self.make_msg('cluster_add_nodes',
@@ -217,12 +218,17 @@ class EngineClient(object):
                                        filters=filters,
                                        project_safe=project_safe))
 
-    def node_create(self, ctxt, name, cluster_id, profile_id, role, metadata):
+    def node_create(self, ctxt, name, cluster_id, profile_id, role, metadata,
+                    host, container_name):
         return self.call(ctxt,
                          self.make_msg('node_create', name=name,
                                        profile_id=profile_id,
                                        cluster_id=cluster_id,
-                                       role=role, metadata=metadata))
+                                       role=role, metadata=metadata,
+                                       host=host,
+                                       container_name=container_name,
+                                      )
+                        )
 
     def node_get(self, ctxt, identity, show_details=False):
         return self.call(ctxt,
@@ -336,3 +342,27 @@ class EngineClient(object):
 
     def get_revision(self, ctxt):
         return self.call(ctxt, self.make_msg('get_revision'))
+
+    def container_list(self, ctxt, Limit=None, host=None):
+        return self.call(ctxt,
+                         self.make_msg('container_list',
+                                       limit=Limit,
+                                       host=host)
+                        )
+
+    def container_create(self, ctxt, image, node=None, command=None,
+                         name=None):
+        return self.call(ctxt,
+                         self.make_msg('container_create',
+                                       node=node,
+                                       image=image,
+                                       command=command,
+                                       name=name)
+                        )
+
+    def container_delete(self, ctxt, path, cast=True):
+        rpc_method = self.cast if cast else self.call
+        return rpc_method(ctxt,
+                          self.make_msg('container_delete',
+                                        path=path)
+                         )

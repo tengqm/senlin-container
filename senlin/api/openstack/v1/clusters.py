@@ -40,6 +40,7 @@ class ClusterData(object):
         self.max_size = data.get(consts.CLUSTER_MAX_SIZE, None)
         self.timeout = data.get(consts.CLUSTER_TIMEOUT,
                                 cfg.CONF.default_action_timeout)
+        self.host_cluster = data.get(consts.HOST_CLUSTER, None)
 
     def _enforce_data_types(self):
         if self.desired_capacity is not None:
@@ -173,7 +174,9 @@ class ClusterController(wsgi.Controller):
 
         cluster = self.rpc_client.cluster_create(
             req.context, data.name, data.desired_capacity, data.profile,
-            data.min_size, data.max_size, data.metadata, data.timeout)
+            data.min_size, data.max_size, data.metadata, data.timeout,
+            data.host_cluster
+        )
         action_id = cluster.pop('action')
         result = {
             'cluster': cluster,

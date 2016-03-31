@@ -18,6 +18,7 @@ from senlin.api.openstack.v1 import actions
 from senlin.api.openstack.v1 import build_info
 from senlin.api.openstack.v1 import cluster_policies
 from senlin.api.openstack.v1 import clusters
+from senlin.api.openstack.v1 import containers
 from senlin.api.openstack.v1 import events
 from senlin.api.openstack.v1 import nodes
 from senlin.api.openstack.v1 import policies
@@ -277,5 +278,26 @@ class API(wsgi.Router):
                                "/build-info",
                                action="build_info",
                                conditions={'method': 'GET'})
+
+        # Containers
+        res = wsgi.Resource(containers.ContainerController(conf))
+        with mapper.submapper(controller=res) as sub_mapper:
+
+            sub_mapper.connect("container_index",
+                               "/containers",
+                               action="index",
+                               conditions={'method': 'GET'})
+
+            sub_mapper.connect("container_create",
+                               "/containers",
+                               action="create",
+                               conditions={'method': 'POST'},
+                               success=202)
+
+            sub_mapper.connect("container_delete",
+                               "/containers/{path}",
+                               action="delete",
+                               conditions={'method': 'DELETE'},
+                               success=202)
 
         super(API, self).__init__(mapper)
