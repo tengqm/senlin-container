@@ -769,7 +769,8 @@ class EngineService(service.Service):
         if host_cluster:
             host_cluster = self.cluster_get(context, host_cluster)
             host_nodes = host_cluster['nodes']
-            metadata.update(nodes=host_nodes)
+            metadata.update(host_cluster=host_cluster['id'])
+            metadata.update(candidate_nodes=host_nodes)
 
         kwargs = {
             'min_size': min_size,
@@ -781,7 +782,8 @@ class EngineService(service.Service):
             'domain': context.domain,
         }
 
-        cluster = cluster_mod.Cluster(name, init_size, db_profile.id, **kwargs)
+        cluster = cluster_mod.Cluster(name, init_size, db_profile.id,
+                                      **kwargs)
         cluster.store(context)
 
         # Build an Action for cluster creation
@@ -1181,6 +1183,22 @@ class EngineService(service.Service):
 
         # Validation
         db_cluster = self.cluster_find(context, identity)
+        cluster = cluster_mod.Cluster.load(context, cluster=db_cluster)
+        metadata = cluster.to_dict()['metadata']
+        host_cluster = metadata.get('host_cluster', None)
+        candidate_hosts = []
+        if host_cluster:
+            host_cluster = self.cluster_get(context, host_cluster)
+            candidate_nodes = host_cluster['nodes']
+        host_nodes = metadata.get('host_nodes', None)
+        if host_nodes and candidate_nodes:
+            for node in candidate_nodes:
+                if node not in host_nodes:
+                    candidate_hosts.append(node)
+        if candidate_hosts:
+            metadata.update(candidate_hosts=candidate_hosts)
+            cluster.metadate = metadata
+            cluster.store(context)
         if count is not None:
             count = utils.parse_int_param('count', count, allow_zero=False)
             err = su.check_size_params(db_cluster,
@@ -1201,6 +1219,8 @@ class EngineService(service.Service):
             'status': action_mod.Action.READY,
             'inputs': inputs,
         }
+        if candidate_hosts:
+            params.update(candidate_hosts=candidate_hosts)
         action_id = action_mod.Action.create(context, db_cluster.id,
                                              consts.CLUSTER_SCALE_OUT,
                                              **params)
@@ -1428,8 +1448,10 @@ class EngineService(service.Service):
 
         # Create a node instance
         if host:
+            host_node = self.node_find(context, host)
             host_ip = self.get_host_ip(context, host)
             metadata.update(host_ip=host_ip)
+            metadata.update(host_node=host_node.id)
         if container_name:
             metadata.update(container_name=container_name)
         kwargs = {

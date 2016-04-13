@@ -127,7 +127,7 @@ class ClusterAction(base.Action):
                server_ip = output['output_value']
         return server_ip
 
-    def _create_nodes(self, count, host_nodes=[]):
+    def _create_nodes(self, count, candidate_nodes=[]):
         """Utility method for node creation.
 
         :param count: Number of nodes to create.
@@ -141,15 +141,20 @@ class ClusterAction(base.Action):
 
         nodes = []
         child = []
-        metadata = {}
+        node_metadata = {}
+        cluster_metadata = self.cluster.metadata
+        candidates = []
         for m in range(count):
-            if host_nodes:
-                host_ip = self._get_host_ip(self.context, host_nodes[m])
-                metadata.update(host_ip=host_ip)
+            if candidate_nodes:
+                host_ip = self._get_host_ip(self.context, candidate_nodes[m])
+                node_metadata.update(host_ip=host_ip)
+                node_metadata.update(host_node=candidate_nodes[m])
+                candidate_nodes[m] = ''
+
             index = db_api.cluster_next_index(self.context, self.cluster.id)
             kwargs = {
                 'index': index,
-                'metadata': metadata,
+                'metadata': node_metadata,
                 'user': self.cluster.user,
                 'project': self.cluster.project,
                 'domain': self.cluster.domain,
@@ -175,6 +180,11 @@ class ClusterAction(base.Action):
                                            consts.NODE_CREATE, **kwargs)
             child.append(action_id)
 
+        for candidate in candidate_nodes:
+            if candidate:
+                candidates.append(candidate)
+        self.cluster.metadata.update(candidate_nodes=candidates)
+        self.cluster.store(self.context)
         if child:
             # Build dependency and make the new action ready
             db_api.dependency_add(self.context, [a for a in child], self.id)
@@ -212,11 +222,12 @@ class ClusterAction(base.Action):
             self.cluster.set_status(self.context, self.cluster.ERROR, reason)
             return self.RES_ERROR, reason
 
-        host_nodes = self.cluster.metadata.get('nodes', None)
-        if host_nodes:
-            self.cluster.desired_capacity = len(host_nodes)
+        l = self.cluster.desired_capacity
+        candidate_nodes = self.cluster.metadata.get('candidate_nodes', [])
+        if candidate_nodes and l == 0:
+            self.cluster.desired_capacity = len(candidate_nodes)
         result, reason = self._create_nodes(self.cluster.desired_capacity,
-                                            host_nodes=host_nodes)
+                                            candidate_nodes=candidate_nodes)
 
         if result == self.RES_OK:
             reason = _('Cluster creation succeeded.')
@@ -682,7 +693,8 @@ class ClusterAction(base.Action):
                                     status_reason)
             return self.RES_ERROR, result
 
-        result, reason = self._create_nodes(count)
+        candidate_nodes = self.cluster.metadata.get('candidate_nodes', [])
+        result, reason = self._create_nodes(count, candidate_nodes)
         if result == self.RES_OK:
             reason = _('Cluster scaling succeeded.')
             # TODO(anyone): make update to desired_capacity customizable

@@ -142,6 +142,7 @@ class Action(object):
         self.updated_at = kwargs.get('updated_at', None)
 
         self.data = kwargs.get('data', {})
+        self.candidate_hosts = kwargs.get('candidate_hosts', [])
 
     def store(self, context):
         """Store the action record into database table.

@@ -33,9 +33,8 @@ class DockerClient(object):
         self.dockerclient = Client(base_url=url)
 
     def create_container(self, image, container_name):
-        try:
-            container = self.dockerclient.create_container(image=image,
-                                                           name=container_name)
+        container = self.dockerclient.create_container(image=image,
+                                                       name=container_name)
         return container
 
     def delete_container(self, container):
