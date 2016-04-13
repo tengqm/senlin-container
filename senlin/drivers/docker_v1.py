@@ -13,7 +13,6 @@
 import json
 
 from docker import Client
-from docker import errors
 from oslo_config import cfg
 from oslo_log import log
 
@@ -37,16 +36,11 @@ class DockerClient(object):
         try:
             container = self.dockerclient.create_container(image=image,
                                                            name=container_name)
-        except errors.NotFound:
-            for line in self.dockerclient.pull(image, stream=True):
-                json.dumps(json.loads(line), indent=4)
-            container = self.dockerclient.create_container(image=image,
-                                                           name=container_name)
         return container
 
     def delete_container(self, container):
         try:
             res = self.dockerclient.remove_container(container)
-        except errors.NotFound:
+        except Exception:
             return True
         return True
