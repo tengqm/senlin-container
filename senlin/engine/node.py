@@ -41,8 +41,8 @@ class Node(object):
         'DELETING', 'RECOVERING'
     )
 
-    def __init__(self, name, profile_id, cluster_id=None, context=None,
-                 **kwargs):
+    def __init__(self, name, profile_id, cluster_id=None,
+                 context=None, **kwargs):
         self.id = kwargs.get('id', None)
         if name:
             self.name = name
@@ -54,6 +54,8 @@ class Node(object):
         if cluster_id is None:
             cluster_id = ''
 
+        self.host_ip = kwargs.get('host_ip', '')
+        self.container_name = kwargs.get('container_name', '')
         self.physical_id = kwargs.get('physical_id', '')
         self.profile_id = profile_id
         self.user = kwargs.get('user', '')
@@ -249,6 +251,11 @@ class Node(object):
         self.set_status(context, self.CREATING, reason='Creation in progress')
         try:
             physical_id = profile_base.Profile.create_object(context, self)
+            if len(physical_id) > 36:
+                container_id = physical_id
+                self.metadata.update(container_id=container_id)
+                physical_id = physical_id[:36]
+
         except exception.InternalError as ex:
             LOG.exception(_('Failed in creating server: %s'),
                           six.text_type(ex))
@@ -393,3 +400,7 @@ class Node(object):
             self.store(context)
 
         return True
+
+    def get_details(self, context):
+        details = profile_base.Profile.get_details(context, self)
+        return details

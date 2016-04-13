@@ -14,6 +14,7 @@ import copy
 import eventlet
 
 from oslo_log import log as logging
+from oslo_utils import uuidutils
 
 from senlin.common import consts
 from senlin.common import exception
@@ -29,6 +30,7 @@ from senlin.engine import event as EVENT
 from senlin.engine import node as node_mod
 from senlin.engine import scheduler
 from senlin.engine import senlin_lock
+from senlin.engine import service as sv
 from senlin.policies import base as policy_mod
 
 LOG = logging.getLogger(__name__)
@@ -102,7 +104,30 @@ class ClusterAction(base.Action):
 
         return self.RES_OK, 'All dependents ended with success'
 
-    def _create_nodes(self, count):
+    def _get_host_ip(self, context, host):
+        if uuidutils.is_uuid_like(host):
+            db_node = db_api.node_get(context, host, project_safe=True)
+            if not db_node:
+                db_node = db_api.node_get_by_name(context, host,
+                                                  project_safe=True)
+        else:
+            db_node = db_api.node_get_by_name(context, host,
+                                              project_safe=True)
+            if not node:
+                db_node = db_api.node_get_short_id(context, host,
+                                                   project_safe=True)
+
+        physical_id = db_node.physical_id
+        if not physical_id:
+            return
+        node = node_mod.Node.load(context, node_id=db_node.id)
+        details = node.get_details(context)
+        for output in details.outputs:
+           if output['output_key'] == 'floating_ip':
+               server_ip = output['output_value']
+        return server_ip
+
+    def _create_nodes(self, count, host_nodes=[]):
         """Utility method for node creation.
 
         :param count: Number of nodes to create.
@@ -116,11 +141,15 @@ class ClusterAction(base.Action):
 
         nodes = []
         child = []
+        metadata = {}
         for m in range(count):
+            if host_nodes:
+                host_ip = self._get_host_ip(self.context, host_nodes[m])
+                metadata.update(host_ip=host_ip)
             index = db_api.cluster_next_index(self.context, self.cluster.id)
             kwargs = {
                 'index': index,
-                'metadata': {},
+                'metadata': metadata,
                 'user': self.cluster.user,
                 'project': self.cluster.project,
                 'domain': self.cluster.domain,
@@ -183,7 +212,11 @@ class ClusterAction(base.Action):
             self.cluster.set_status(self.context, self.cluster.ERROR, reason)
             return self.RES_ERROR, reason
 
-        result, reason = self._create_nodes(self.cluster.desired_capacity)
+        host_nodes = self.cluster.metadata.get('nodes', None)
+        if host_nodes:
+            self.cluster.desired_capacity = len(host_nodes)
+        result, reason = self._create_nodes(self.cluster.desired_capacity,
+                                            host_nodes=host_nodes)
 
         if result == self.RES_OK:
             reason = _('Cluster creation succeeded.')

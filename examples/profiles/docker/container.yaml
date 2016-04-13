@@ -1,0 +1,104 @@
+heat_template_version: 2013-05-23
+
+parameters:
+  key_name:
+    type: string
+    default: test_key
+  image:
+    type: string
+    default: CoreOS
+  flavor:
+    type: string
+    default: m1.small
+  public_network:
+    type: string
+    default: public
+    description: ID of public network.
+  network:
+    type: string
+    default: private
+  subnet:
+    type: string
+    default: private-subnet
+  security_group:
+    type: string
+    default: security-group
+
+resources:
+  my_instance1:
+    type: OS::Nova::Server
+    properties:
+      key_name: { get_param: key_name }
+      image: { get_param: image }
+      flavor: { get_param: flavor }
+      name: inst1
+      networks:
+        - port: { get_resource: inst1_port }
+      user_data_format: RAW
+      user_data: |
+         #cloud-config
+         write_files:
+           - path: /etc/systemd/system/docker-tcp.socket
+             owner: "root:root"
+             permissions: "0644"
+             content: |
+               [Unit]
+               Description=Docker Socket for the API
+
+               [Socket]
+               ListenStream=2375
+               BindIPv6Only=both
+               Service=docker.service
+
+               [Install]
+               WantedBy=sockets.target
+           - path: /etc/systemd/system/pull_image.service
+             owner: "root:root"
+             permissions: "0755"
+             content: |
+               [Unit]
+               Description=Docker image download
+
+               [Service]
+               ExecStart=/home/core/pull_image.sh
+               Restart=always
+               Type=simple
+
+               [Install]
+               WantedBy=multi-user.target
+
+           - path: /home/core/pull_image.sh
+             owner: "root:root"
+             permissions: "0755"
+             content: |
+               #!/bin/bash
+               docker pull hello-world
+
+         coreos:
+           units:
+             - name: "docker-tcp.socket"
+               command: "start"
+             - name: "pull_image.service"
+               command: "start"
+  inst1_port:
+    type: OS::Neutron::Port
+    properties:
+      network: { get_param: network }
+      fixed_ips:
+        - subnet: { get_param: subnet }
+      security_groups: [{get_param: security_group }]
+
+  inst1_floating_ip:
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network: { get_param: public_network }
+      port_id: { get_resource: inst1_port }
+      fixed_ip_address: {get_attr: [inst1_port, fixed_ips, 0, ip_address]}
+
+outputs:
+  floating_ip:
+    value: { get_attr: [ inst1_floating_ip, floating_ip_address ] }
+    description: The floatingip assigned to the instance.
+  port_id:
+    value: { get_attr: [ inst1_floating_ip, port_id ] }
+    description: The port_id of the instance.

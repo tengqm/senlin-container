@@ -52,6 +52,12 @@ class NodeData(object):
     def metadata(self):
         return self.data.get(consts.NODE_METADATA, None)
 
+    def host(self):
+        return self.data.get(consts.HOST, None)
+
+    def container_name(self):
+        return self.data.get(consts.CONTAINER_NAME, None)
+
 
 class NodeController(wsgi.Controller):
     """WSGI controller for nodes resource in Senlin v1 API."""
@@ -114,7 +120,9 @@ class NodeController(wsgi.Controller):
         node = self.rpc_client.node_create(req.context, data.name(),
                                            data.cluster_id(),
                                            data.profile_id(),
-                                           data.role(), data.metadata())
+                                           data.role(), data.metadata(),
+                                           data.host(), data.container_name(),
+                                           )
         action_id = node.pop('action')
         result = {
             'node': node,
