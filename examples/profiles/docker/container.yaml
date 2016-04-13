@@ -28,7 +28,7 @@ resources:
   my_instance1:
     type: OS::Nova::Server
     properties:
-      key_name: { get_param: key_name } 
+      key_name: { get_param: key_name }
       image: { get_param: image }
       flavor: { get_param: flavor }
       name: inst1
@@ -49,7 +49,7 @@ resources:
                ListenStream=2375
                BindIPv6Only=both
                Service=docker.service
-         
+
                [Install]
                WantedBy=sockets.target
            - path: /etc/systemd/system/pull_image.service
@@ -76,7 +76,7 @@ resources:
 
          coreos:
            units:
-             - name: "docker-tcp.socket"         
+             - name: "docker-tcp.socket"
                command: "start"
              - name: "pull_image.service"
                command: "start"
